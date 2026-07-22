@@ -2,7 +2,6 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="robots" content="noindex, nofollow">
 <!-- Google Tag Manager -->
 <script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
 new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
@@ -11,6 +10,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
 })(window,document,'script','dataLayer','GTM-K64DWVTL');</script>
 <!-- End Google Tag Manager -->
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
 <title>RF Microneedling in Ellicott City, MD | Skin Therapeutics Med Spa</title>
 <meta name="description" content="Genius RF Microneedling at Skin Therapeutics. Rebuild collagen, tighten and smooth your skin with no surgery or downtime. Free consult + $500 gift card.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -281,6 +281,12 @@ section[id]{scroll-margin-top:132px}
 .field input{height:48px;border:1px solid var(--gray);border-radius:3px;padding:0 16px;font-family:'Poppins';font-size:14px;font-weight:300;color:var(--text);background:#fff;transition:border-color .2s ease;width:100%}
 .field input::placeholder{color:#44444480}
 .form-note{font-size:12px;font-weight:300;color:var(--mauve2);text-align:center}
+.form-error{display:none;font-size:13px;color:#b3261e}
+.form-consent{display:flex;align-items:flex-start;gap:10px}
+.form-consent-checkbox{flex:none;margin-top:3px;accent-color:var(--plum)}
+.form-consent-text{font-size:12px;font-weight:300;color:var(--mauve2);line-height:1.5}
+.form-success-message{display:flex;flex-direction:column;gap:10px}
+.form-success-message h3{font-family:'Playfair Display';font-size:26px;color:var(--text)}
 
 /* ============ MAP ============ */
 .map-section{background:#fff}
@@ -649,6 +655,11 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
     <div class="field"><label>EMAIL</label><input type="email" name="email" placeholder="jane@email.com" required></div>
     <div class="field"><label>PHONE NUMBER</label><input type="tel" name="phone" placeholder="410 555 0123" required></div>
     <div class="field"><label>YOUR CONCERN</label><input type="text" name="concern" id="formConcern" placeholder="Tell us what you'd like to improve" required></div>
+    <div class="form-consent">
+      <input id="newsletter" name="newsletter" type="checkbox" required class="form-consent-checkbox">
+      <label for="newsletter" class="form-consent-text"><i>By submitting this form, you agree to receive marketing text messages, alerts, and notifications from Skin Therapeutics. Message frequency may vary. Rates may be applied. You can opt out at any time by replying STOP.</i></label>
+    </div>
+    <div id="form-error" class="form-error" role="alert" aria-live="polite"></div>
     <button type="submit" class="btn btn-solid btn-block">Claim My Free Consult + $500 Off</button>
     <span class="form-note">Your information stays private. No spam, ever.</span>
   </form>
@@ -854,12 +865,89 @@ if(IS_TOUCH){
   });
 }
 
-document.getElementById("leadForm").addEventListener("submit",function(e){
-  e.preventDefault();
-  var btn=e.target.querySelector("button");
-  btn.textContent="Thank you, we'll call you within one business day.";
-  btn.style.background="var(--dark)";btn.disabled=true;
-});
+(function(){
+  var form=document.getElementById("leadForm");
+  if(!form)return;
+  var submitBtn=form.querySelector('button[type="submit"]');
+  var errEl=form.querySelector("#form-error");
+
+  function showError(msg){
+    if(!errEl)return;
+    errEl.textContent=msg;
+    errEl.style.display=msg?"block":"none";
+  }
+
+  form.addEventListener("submit",async function(e){
+    e.preventDefault();
+    showError("");
+    submitBtn.disabled=true;
+
+    var first_name=form.querySelector('[name="firstName"]').value.trim();
+    var last_name=form.querySelector('[name="lastName"]').value.trim();
+    var email=form.querySelector('[name="email"]').value.trim();
+    var phone=form.querySelector('[name="phone"]').value.replace(/\D/g,"");
+    var message=form.querySelector("#formConcern").value.trim();
+
+    var emailRe=/^[^\s@]+@[^\s@]+\.[A-Za-z]{2,}$/;
+    if(!emailRe.test(email)){
+      showError("Please enter a valid email address.");
+      submitBtn.disabled=false;
+      return;
+    }
+
+    if(!/^[0-9]{10}$/.test(phone)){
+      showError("Please enter a 10-digit US phone number.");
+      submitBtn.disabled=false;
+      return;
+    }
+
+    var fd=new FormData();
+    fd.append("first_name",first_name);
+    fd.append("last_name",last_name);
+    fd.append("phone","+1"+phone);
+    fd.append("email",email);
+    fd.append("checkbox",form.querySelector("#newsletter").checked?"on":"");
+    fd.append("organization","38da293c-6f37-40ac-b431-4ce9dc23977a");
+    fd.append("form","525");
+    fd.append("message",message);
+    fd.append("form_location",window.location.href);
+
+    // Detect ad tracking params from URL
+    var urlParams=new URLSearchParams(window.location.search);
+    var trackingMap={gclid:"google",wbraid:"google",gbraid:"google",fbclid:"meta",ttclid:"tiktok"};
+    var trackingParam="",adSource="other";
+    for(var param in trackingMap){
+      var val=urlParams.get(param);
+      if(val){trackingParam=val;adSource=trackingMap[param];break;}
+    }
+    fd.append("tracking_param",trackingParam);
+    fd.append("ad_source",adSource);
+
+    try{
+      var res=await fetch("https://api.aevadigital.com/api/v1/contacts/add_contact_from_form/",{
+        method:"POST",
+        body:fd
+      });
+      if(!res.ok){
+        var txt=await res.text().catch(function(){return res.statusText;});
+        throw new Error(txt||"Server error");
+      }
+
+      window.dataLayer=window.dataLayer||[];
+      window.dataLayer.push({event:"form-success"});
+
+      while(form.firstChild)form.removeChild(form.firstChild);
+      var thankYou=document.createElement("div");
+      thankYou.className="form-success-message";
+      thankYou.innerHTML="<h3>Thank You!</h3><p>Your consultation request has been received. We'll call you within one business day.</p>";
+      form.appendChild(thankYou);
+    }catch(err){
+      console.error(err);
+      showError("Submission failed — please try again.");
+      submitBtn.disabled=false;
+    }
+  });
+})();
 
 /* scroll-parallax-zoom on the large procedure image */
 (function(){
